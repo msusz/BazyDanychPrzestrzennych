@@ -1,0 +1,50 @@
+-- zad1
+WITH modified_buildings as (SELECT t1.gid as id from t2018_kar_buildings t1
+             join
+     t2019_kar_buildings t2
+     on (t1.polygon_id = t2.polygon_id)
+     where not st_equals(t1.geom, t2.geom))
+Select * from modified_buildings;
+
+-- zad2
+with buildings as (select t2019_kar_buildings.geom as geom, t2018_kar_buildings.gid as gid
+from t2018_kar_buildings
+         inner join t2019_kar_buildings on t2018_kar_buildings.polygon_id = t2019_kar_buildings.polygon_id
+where not st_equals(t2018_kar_buildings.geom , t2019_kar_buildings.geom))
+select count(distinct(poi.gid)), poi.type from t2019_kar_poi_table as poi cross join buildings where st_dwithin(poi.geom, buildings.geom, 500.0, true) group by poi.type;
+
+-- zad3
+drop table if exists streets_reprojected;
+create table streets_reprojected as (select *  from t2019_kar_streets);
+update streets_reprojected set geom = st_transform(geom, '+proj=longlat +datum=WGS84 +no_defs ','+proj=cass +lat_0=52.41864827777778 +lon_0=13.62720366666667 +x_0=40000 +y_0=10000 +datum=potsdam +units=m +no_defs ');
+
+-- zad4
+drop table if exists input_points;
+create table input_points (
+    id SERIAL,
+    point geometry
+);
+insert into input_points (point)
+values(st_geomfromtext('POINT(8.36093 49.03174)')), (st_geomfromtext('POINT(8.39876 49.00644)'));
+
+-- zad5
+update input_points set point = st_transform(point, '+proj=longlat +datum=WGS84 +no_defs ','+proj=cass +lat_0=52.41864827777778 +lon_0=13.62720366666667 +x_0=40000 +y_0=10000 +datum=potsdam +units=m +no_defs ');
+
+-- zad6
+update t2019_kar_street_node set geom = st_transform(geom, '+proj=longlat +datum=WGS84 +no_defs ','+proj=cass +lat_0=52.41864827777778 +lon_0=13.62720366666667 +x_0=40000 +y_0=10000 +datum=potsdam +units=m +no_defs ');
+with p1 as (select point  from input_points limit 1),
+     p2 as (select point from input_points offset 1 limit 1)
+
+
+select gid, t2019_kar_street_node.geom from t2019_kar_street_node, p1,p2 where st_dwithin(st_makeline(p1.point,p2.point),  t2019_kar_street_node.geom, 300);
+
+
+-- zad7
+select count(distinct sgs.gid) from t2019_kar_poi_table sgs inner join t2019_kar_poi_table p on p.type = 'Park/Recreation Area' and sgs.type = 'Sporting Goods Store' and st_distance(p.geom, sgs.geom) < 300;
+
+-- zad8
+select distinct st_intersection(t2019_kar_water_lines.geom, t2019_kar_railways.geom)
+into t2019_kar_bridges
+from t2019_kar_water_lines, t2019_kar_railways;
+
+select * from t2019_kar_bridges
